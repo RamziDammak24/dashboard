@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { RefreshCw, Package, Database, DollarSign, Users, FileText, Calendar } from 'lucide-react';
+import { RefreshCw, Package, Database, DollarSign, Users, FileText, Calendar, Trash2 } from 'lucide-react';
 
 export default function TestDataGenerator() {
   const [generating, setGenerating] = useState(false);
@@ -14,6 +14,7 @@ export default function TestDataGenerator() {
   const [employeesCount, setEmployeesCount] = useState(4);
   const [reportsCount, setReportsCount] = useState(5);
   const [weeklyTemplatesCount, setWeeklyTemplatesCount] = useState(3);
+  const [deleting, setDeleting] = useState(false);
 
   const addLog = (message: string) => {
     setLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
@@ -45,13 +46,29 @@ export default function TestDataGenerator() {
 
   const generateStock = async (count: number) => {
     addLog(`Generating ${count} stock items...`);
+    
+    // Fetch existing products
+    const productsSnapshot = await getDocs(collection(db, 'products'));
+    const existingProducts = productsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+    
     for (let i = 0; i < count; i++) {
       const date = new Date();
       date.setDate(date.getDate() - Math.floor(Math.random() * 7));
       
+      let productId, productName;
+      if (existingProducts.length > 0) {
+        const randomProduct = existingProducts[Math.floor(Math.random() * existingProducts.length)];
+        productId = randomProduct.id;
+        productName = randomProduct.name;
+      } else {
+        // Fallback if no products exist
+        productId = `test_${Math.random().toString(36).substr(2, 9)}`;
+        productName = `${productNames[Math.floor(Math.random() * productNames.length)]}`;
+      }
+      
       const stock = {
-        productName: `${productNames[Math.floor(Math.random() * productNames.length)]}`,
-        productId: `test_${Math.random().toString(36).substr(2, 9)}`,
+        productName,
+        productId,
         piecesPerTray: Math.floor(Math.random() * 20) + 5,
         targetType: Math.random() > 0.5 ? 'pieces' : 'plateaux',
         percentage: Math.floor(Math.random() * 100),
@@ -212,6 +229,29 @@ export default function TestDataGenerator() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!confirm('Are you sure you want to delete ALL test data? This action cannot be undone.')) return;
+    
+    setDeleting(true);
+    setLog([]);
+    addLog('Starting deletion of all test data...');
+    
+    try {
+      const collections = ['products', 'stock', 'transactions', 'employees', 'reports_archive', 'weeklyTemplates'];
+      for (const col of collections) {
+        const querySnapshot = await getDocs(collection(db, col));
+        const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        addLog(`✓ Deleted all from ${col}`);
+      }
+      addLog('✓ All test data deleted successfully!');
+    } catch (error) {
+      addLog(`✗ Error: ${error}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -235,7 +275,7 @@ export default function TestDataGenerator() {
             />
             <button
               onClick={() => handleGenerateCustom('products', productsCount)}
-              disabled={generating}
+              disabled={generating || deleting}
               className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
             >
               Generate Products
@@ -258,7 +298,7 @@ export default function TestDataGenerator() {
             />
             <button
               onClick={() => handleGenerateCustom('stock', stockCount)}
-              disabled={generating}
+              disabled={generating || deleting}
               className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
             >
               Generate Stock
@@ -281,7 +321,7 @@ export default function TestDataGenerator() {
             />
             <button
               onClick={() => handleGenerateCustom('transactions', transactionsCount)}
-              disabled={generating}
+              disabled={generating || deleting}
               className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 disabled:opacity-50"
             >
               Generate Transactions
@@ -304,7 +344,7 @@ export default function TestDataGenerator() {
             />
             <button
               onClick={() => handleGenerateCustom('employees', employeesCount)}
-              disabled={generating}
+              disabled={generating || deleting}
               className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
             >
               Generate Employees
@@ -327,7 +367,7 @@ export default function TestDataGenerator() {
             />
             <button
               onClick={() => handleGenerateCustom('reports', reportsCount)}
-              disabled={generating}
+              disabled={generating || deleting}
               className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
             >
               Generate Reports
@@ -350,7 +390,7 @@ export default function TestDataGenerator() {
             />
             <button
               onClick={() => handleGenerateCustom('weeklyTemplates', weeklyTemplatesCount)}
-              disabled={generating}
+              disabled={generating || deleting}
               className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 disabled:opacity-50"
             >
               Generate Templates
@@ -365,13 +405,28 @@ export default function TestDataGenerator() {
           </div>
           <button
             onClick={handleGenerateAll}
-            disabled={generating}
+            disabled={generating || deleting}
             className="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {generating && <RefreshCw className="w-4 h-4 animate-spin" />}
             {generating ? 'Generating...' : 'Generate All Data'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex items-center gap-3 mb-3">
+          <Trash2 className="w-8 h-8 text-red-600" />
+          <h3 className="text-lg font-semibold">Delete All</h3>
+        </div>
+        <button
+          onClick={handleDeleteAll}
+          disabled={deleting || generating}
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50 flex items-center justify-start gap-2"
+        >
+          {deleting && <RefreshCw className="w-4 h-4 animate-spin" />}
+          {deleting ? 'Deleting...' : 'Delete All Data'}
+        </button>
       </div>
 
       {log.length > 0 && (

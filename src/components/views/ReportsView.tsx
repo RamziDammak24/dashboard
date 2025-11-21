@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Report } from '@/types';
-import { FileText, Download, Edit2, Trash2, Save, X } from 'lucide-react';
+import { FileText, Edit2, Trash2, Save, X } from 'lucide-react';
 
 export default function ReportsView() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -212,10 +212,6 @@ export default function ReportsView() {
               </button>
             </div>
 
-            <button className="mt-2 w-full flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-sm">
-              <Download className="w-4 h-4" />
-              Download PDF
-            </button>
           </div>
         ))}
       </div>
